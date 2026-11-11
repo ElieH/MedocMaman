@@ -7,6 +7,9 @@ on:
     branches: [ "main", "master" ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -25,6 +28,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: '8.7'
+          cache-read-only: false
 
       - name: Build Debug APK
         run: gradle assembleDebug --no-daemon --stacktrace
@@ -36,9 +40,20 @@ jobs:
         run: |
           cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/MedocMaman-debug.apk
 
+      - name: Publish Direct-Download APK to GitHub Releases
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest app/build/outputs/apk/debug/MedocMaman-debug.apk \
+            --title "MedocMaman APK (Dernière version)" \
+            --notes "Téléchargez **MedocMaman-debug.apk** directement sur le Xiaomi Redmi de Maman ou sur les téléphones des enfants."
+
       - name: Upload MedocMaman APK Artifact
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: MedocMaman-APK
           path: app/build/outputs/apk/debug/MedocMaman-debug.apk
-          if-no-files-found: error
+          if-no-files-found: warn
